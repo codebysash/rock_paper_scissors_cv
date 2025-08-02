@@ -1,3 +1,5 @@
+import random
+
 import cv2
 import cvzone
 from cvzone.HandTrackingModule import HandDetector
@@ -12,6 +14,7 @@ detector = HandDetector(maxHands=1)
 timer = 0
 stateResult = False
 startGame = False
+scores = [0, 0] # [AI, Player]
 
 while True:
     imgBG = cv2.imread("Resources/BG.png")
@@ -32,9 +35,10 @@ while True:
                 stateResult = True
                 timer = 0
 
-                playerMove = 0 # Default value
+
 
                 if hands:
+                    playerMove = None  # Default value
                     hand = hands[0]
                     fingers = detector.fingersUp(hand)
                     if fingers == [0, 0, 0, 0, 0]:
@@ -44,13 +48,21 @@ while True:
                     elif fingers == [0, 1, 1, 0, 0]:
                         playerMove = 3
 
+                    randomNumber = random.randint(1, 3)
+                    imgAI = cv2.imread(f'Resources/{randomNumber}.png', cv2.IMREAD_UNCHANGED)
+                    imgBG = cvzone.overlayPNG(imgBG, imgAI, (149, 310))
+
                     print(playerMove)
 
 
 
     imgBG[234:654, 795:1195] = imgScaled
 
+    if stateResult:
+        imgBG = cvzone.overlayPNG(imgBG, imgAI, (149, 310))
 
+    cv2.putText(imgBG, str(scores[0]), (410, 215), cv2.FONT_HERSHEY_PLAIN, 4, (255, 255, 255), 6)
+    cv2.putText(imgBG, str(scores[1]), (1112, 215), cv2.FONT_HERSHEY_PLAIN, 4, (255, 255, 255), 6)
 
     # cv2.imshow("Image", img)
     cv2.imshow("BG", imgBG)
@@ -60,3 +72,4 @@ while True:
     if key == ord('s'):
         startGame = True
         initialTime = time.time()
+        stateResult = False
