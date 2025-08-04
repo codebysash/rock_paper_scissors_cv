@@ -1359,6 +1359,13 @@ class RockPaperScissorsGame {
         let detectedGesture = null;
         let gestureName = '';
         
+        // 🚫 SPORTSMANSHIP DETECTOR - Check for middle finger first!
+        if (this.startGame && !this.stateResult && this.detectMiddleFinger(fingers)) {
+            console.log('🚫 UNSPORTSMANLIKE CONDUCT DETECTED!');
+            this.handleUnsportsmanlikeConduct();
+            return; // Stop processing other gestures
+        }
+        
         // Rock: All fingers down (fist) - allow some tolerance
         const downFingers = fingers.filter(f => !f).length;
         if (downFingers >= 4) { // At least 4 fingers down
@@ -1399,6 +1406,106 @@ class RockPaperScissorsGame {
                 console.log(`Unclear gesture: ${upFingers} fingers up`, fingers.map(f => f ? '1' : '0').join(''));
             }
         }
+    }
+    
+    // 🚫 Sportsmanship Detector - Middle finger detection
+    detectMiddleFinger(fingers) {
+        // Middle finger pattern: Only middle finger up, all others down
+        // fingers array: [thumb, index, middle, ring, pinky]
+        const isMiddleFingerUp = fingers[2]; // Middle finger
+        const isIndexDown = !fingers[1]; // Index finger down
+        const isRingDown = !fingers[3]; // Ring finger down 
+        const isPinkyDown = !fingers[4]; // Pinky down
+        // Thumb can be up or down (thumb position varies)
+        
+        // Classic middle finger: only middle finger extended
+        const classicMiddleFinger = isMiddleFingerUp && isIndexDown && isRingDown && isPinkyDown;
+        
+        return classicMiddleFinger;
+    }
+    
+    // 🚫 Handle unsportsmanlike conduct
+    handleUnsportsmanlikeConduct() {
+        console.log('🚫 Player disqualified for unsportsmanlike conduct!');
+        
+        // Play a disapproving sound
+        this.playSound('matchLose');
+        
+        // Immediately end the game with AI victory
+        this.scores[0] = 3; // AI wins
+        this.scores[1] = Math.min(this.scores[1], 2); // Player can't win
+        this.gameOver = true;
+        this.startGame = false;
+        this.stateResult = true;
+        
+        // Show disqualification on canvas
+        this.drawDisqualificationMessage();
+        
+        // Update status
+        this.gameStatus.textContent = '🚫 DISQUALIFIED for bad conduct!';
+        this.gameStatus.style.color = '#ff0000';
+        this.updateDisplay();
+        
+        // Show special game over modal after delay
+        setTimeout(() => {
+            this.showUnsportsmanlikeGameOver();
+        }, 2000);
+    }
+    
+    // Draw disqualification message on canvas
+    drawDisqualificationMessage() {
+        this.canvasCtx.save();
+        
+        // Red warning background
+        this.canvasCtx.fillStyle = 'rgba(255, 0, 0, 0.8)';
+        this.canvasCtx.fillRect(0, 0, this.canvasElement.width, this.canvasElement.height);
+        
+        // Warning text
+        this.canvasCtx.fillStyle = '#ffffff';
+        this.canvasCtx.font = 'bold 24px Arial';
+        this.canvasCtx.textAlign = 'center';
+        
+        const centerX = this.canvasElement.width / 2;
+        const centerY = this.canvasElement.height / 2;
+        
+        this.canvasCtx.fillText('🚫 DISQUALIFIED!', centerX, centerY - 10);
+        this.canvasCtx.fillText('BAD CONDUCT!', centerX, centerY + 20);
+        
+        this.canvasCtx.restore();
+    }
+    
+    // Special game over for disqualification
+    showUnsportsmanlikeGameOver() {
+        const gameOverTitle = document.getElementById('gameOverTitle');
+        const gameOverMessage = document.getElementById('gameOverMessage');
+        
+        // Fun random messages (shorter for better fit)
+        const unsportsmanlikeMessages = [
+            "DISQUALIFIED! 🚫",
+            "KEEP IT CLEAN! 😤", 
+            "BAD CONDUCT! 🚨",
+            "REFEREE SAYS NO! 🏃‍♂️",
+            "SHAME ON YOU! 😠",
+            "PLAY NICE! 🤨",
+            "CAUGHT RED-HANDED! 👀"
+        ];
+        
+        const descriptions = [
+            "AI wins by default due to poor sportsmanship!",
+            "Keep it clean next time, champ! 🧽",
+            "The digital referee is watching! 👀",
+            "Play nice or don't play at all! 😤",
+            "Sportsmanship matters in Rock Paper Scissors! 🤝"
+        ];
+        
+        const randomMessage = unsportsmanlikeMessages[Math.floor(Math.random() * unsportsmanlikeMessages.length)];
+        const randomDescription = descriptions[Math.floor(Math.random() * descriptions.length)];
+        
+        gameOverTitle.textContent = randomMessage;
+        gameOverTitle.style.color = '#ff0000';
+        gameOverMessage.textContent = randomDescription;
+        
+        this.showModal(this.gameOverModal);
     }
     
     drawGestureIndicator(gestureName) {
