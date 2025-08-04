@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #222;
+            color: white;
+        }
+        video {
+            width: 100%;
+            max-width: 640px;
+            background: #000;
+            border: 2px solid #fff;
+            margin: 20px 0;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 5px;
+            margin: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .log {
+            background: #333;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            margin: 20px 0;
+            white-space: pre-wrap;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .success {
+            background: #28a745;
+        }
+        .error {
+            background: #dc3545;
+        }
+        .warning {
+            background: #ffc107;
+            color: black;
+        }
+    </style>
+</head>
+<body>
+    <h1>Camera Access Test</h1>
+    
+    <div id="status" class="status">Ready to test camera access</div>
+    
+    <button onclick="testCameraAccess()">Test Camera Access</button>
+    <button onclick="testWithConstraints()">Test with Constraints</button>
+    <button onclick="testLegacyMethod()">Test Legacy Method</button>
+    <button onclick="clearLog()">Clear Log</button>
+    
+    <video id="video" autoplay playsinline muted></video>
+    
+    <div class="log" id="log"></div>
+
+    <script>
+        const video = document.getElementById('video');
+        const logElement = document.getElementById('log');
+        const statusElement = document.getElementById('status');
+        let currentStream = null;
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logMessage = `[${timestamp}] ${type.toUpperCase()}: ${message}\n`;
+            logElement.textContent += logMessage;
+            logElement.scrollTop = logElement.scrollHeight;
+            console.log(`${type.toUpperCase()}: ${message}`);
+        }
+
+        function updateStatus(message, type = 'info') {
+            statusElement.textContent = message;
+            statusElement.className = `status ${type}`;
+        }
+
+        function clearLog() {
+            logElement.textContent = '';
+        }
+
+        // Stop any existing stream
+        function stopStream() {
+            if (currentStream) {
+                currentStream.getTracks().forEach(track => track.stop());
+                currentStream = null;
+                video.srcObject = null;
+                log('Stopped existing camera stream');
+            }
+        }
+
+        // Test basic camera access
+        async function testCameraAccess() {
+            log('=== Starting Basic Camera Test ===');
+            stopStream();
+            updateStatus('Testing camera access...', 'warning');
+
+            try {
+                // Check if getUserMedia is supported
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error('getUserMedia not supported in this browser');
+                }
+
+                log('getUserMedia is supported');
+                log('Requesting camera access...');
+
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: true
+                });
+
+                log('Camera access granted!');
+                log(`Stream tracks: ${stream.getTracks().length}`);
+                
+                currentStream = stream;
+                video.srcObject = stream;
+                
+                // Wait for video to load
+                video.onloadedmetadata = () => {
+                    log(`Video dimensions: ${video.videoWidth}x${video.videoHeight}`);
+                    updateStatus('Camera working successfully!', 'success');
+                };
+
+                video.onerror = (error) => {
+                    log(`Video error: ${error}`, 'error');
+                    updateStatus('Video playback error', 'error');
+                };
+
+            } catch (error) {
+                log(`Camera access failed: ${error.name} - ${error.message}`, 'error');
+                updateStatus(`Camera failed: ${error.message}`, 'error');
+                
+                // Log specific error types
+                if (error.name === 'NotAllowedError') {
+                    log('Permission denied by user or browser policy', 'error');
+                } else if (error.name === 'NotFoundError') {
+                    log('No camera device found', 'error');
+                } else if (error.name === 'NotReadableError') {
+                    log('Camera is already in use by another application', 'error');
+                } else if (error.name === 'OverconstrainedError') {
+                    log('Camera constraints could not be satisfied', 'error');
+                }
+            }
+        }
+
+        // Test with specific constraints
+        async function testWithConstraints() {
+            log('=== Starting Constrained Camera Test ===');
+            stopStream();
+            updateStatus('Testing with constraints...', 'warning');
+
+            const constraints = {
+                video: {
+                    width: { ideal: 640 },
+                    height: { ideal: 480 },
+                    facingMode: 'user'
+                }
+            };
+
+            try {
+                log(`Requesting camera with constraints: ${JSON.stringify(constraints)}`);
+                
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                
+                log('Camera access with constraints granted!');
+                currentStream = stream;
+                video.srcObject = stream;
+                updateStatus('Constrained camera working!', 'success');
+
+            } catch (error) {
+                log(`Constrained camera failed: ${error.name} - ${error.message}`, 'error');
+                updateStatus(`Constrained camera failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Test legacy method
+        async function testLegacyMethod() {
+            log('=== Starting Legacy Camera Test ===');
+            stopStream();
+            updateStatus('Testing legacy method...', 'warning');
+
+            try {
+                // Try the older API if available
+                if (navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia) {
+                    log('Legacy getUserMedia found');
+                    
+                    const getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
+                    
+                    getUserMedia.call(navigator, 
+                        { video: true },
+                        (stream) => {
+                            log('Legacy camera access granted!');
+                            currentStream = stream;
+                            video.srcObject = stream;
+                            updateStatus('Legacy camera working!', 'success');
+                        },
+                        (error) => {
+                            log(`Legacy camera failed: ${error.name} - ${error.message}`, 'error');
+                            updateStatus(`Legacy camera failed: ${error.message}`, 'error');
+                        }
+                    );
+                } else {
+                    log('No legacy getUserMedia methods available', 'warning');
+                    updateStatus('No legacy methods available', 'warning');
+                }
+
+            } catch (error) {
+                log(`Legacy method error: ${error.name} - ${error.message}`, 'error');
+                updateStatus(`Legacy method failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Check browser capabilities on load
+        window.addEventListener('load', () => {
+            log('=== Browser Capabilities Check ===');
+            log(`User Agent: ${navigator.userAgent}`);
+            log(`Protocol: ${window.location.protocol}`);
+            log(`Host: ${window.location.host}`);
+            
+            // Check HTTPS
+            if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+                log('WARNING: Not using HTTPS - camera may be blocked', 'error');
+                updateStatus('Warning: Camera requires HTTPS in production', 'error');
+            }
+
+            // Check APIs
+            log(`navigator.mediaDevices: ${!!navigator.mediaDevices}`);
+            log(`getUserMedia: ${!!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)}`);
+            log(`Legacy getUserMedia: ${!!(navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia)}`);
+            
+            // Check permissions API
+            if ('permissions' in navigator) {
+                log('Permissions API available');
+                navigator.permissions.query({ name: 'camera' }).then(result => {
+                    log(`Camera permission state: ${result.state}`);
+                }).catch(err => {
+                    log(`Permission query failed: ${err.message}`, 'error');
+                });
+            } else {
+                log('Permissions API not available');
+            }
+        });
+
+        // Handle page visibility changes
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                log('Page hidden - camera may pause');
+            } else {
+                log('Page visible - camera should resume');
+            }
+        });
+    </script>
+</body>
+</html>

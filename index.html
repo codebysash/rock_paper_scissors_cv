@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://cdn.jsdelivr.net https://unpkg.com https://cdnjs.cloudflare.com https://tfhub.dev https://storage.googleapis.com; worker-src 'self' blob:; child-src 'self' blob:; object-src 'none'; base-uri 'self';">
+    <meta http-equiv="Permissions-Policy" content="camera=(self), microphone=(), geolocation=()">
+    <title>Rock Paper Scissors - Hand Gesture Game</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Try multiple CDN sources for reliability -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/handpose@0.0.7/dist/handpose.min.js"></script>
+    
+    <!-- MediaPipe as backup -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    
+    <!-- Fallback CDN if primary fails -->
+    <script>
+        let tfLoaded = false;
+        let handposeLoaded = false;
+        
+        // Check primary loading
+        setTimeout(() => {
+            tfLoaded = typeof tf !== 'undefined';
+            handposeLoaded = typeof handpose !== 'undefined';
+            
+            console.log('📦 Primary CDN check:');
+            console.log('- TensorFlow.js:', tfLoaded ? '✅' : '❌');
+            console.log('- HandPose:', handposeLoaded ? '✅' : '❌');
+            
+            // Try backup CDN if primary failed
+            if (!tfLoaded) {
+                console.log('🔄 Loading TensorFlow.js backup...');
+                const script = document.createElement('script');
+                script.src = 'https://unpkg.com/@tensorflow/tfjs@4.10.0/dist/tf.min.js';
+                script.onload = () => console.log('✅ TensorFlow.js backup loaded');
+                script.onerror = () => console.error('❌ TensorFlow.js backup failed');
+                document.head.appendChild(script);
+            }
+            
+            if (!handposeLoaded) {
+                console.log('🔄 Loading HandPose backup...');
+                const script = document.createElement('script');
+                script.src = 'https://unpkg.com/@tensorflow-models/handpose@0.0.7/dist/handpose.min.js';
+                script.onload = () => console.log('✅ HandPose backup loaded');
+                script.onerror = () => console.error('❌ HandPose backup failed');
+                document.head.appendChild(script);
+            }
+        }, 1000);
+        
+        // Final check after backup attempts
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                console.log('🏁 Final library status:');
+                console.log('- TensorFlow.js:', typeof tf !== 'undefined' ? '✅ Available' : '❌ Missing');
+                console.log('- HandPose:', typeof handpose !== 'undefined' ? '✅ Available' : '❌ Missing');
+                
+                if (typeof tf !== 'undefined') {
+                    console.log('- TensorFlow version:', tf.version);
+                }
+            }, 3000);
+        });
+    </script>
+</head>
+<body>
+    <div class="game-container">
+        <div class="background-layer"></div>
+        
+        <!-- Game Header -->
+        <div class="game-header">
+            <h1>Rock Paper Scissors</h1>
+            <div class="score-board">
+                <div class="score ai-score">
+                    <span class="label">AI</span>
+                    <span class="score-value" id="aiScore">0</span>
+                </div>
+                <div class="score player-score">
+                    <span class="label">Player</span>
+                    <span class="score-value" id="playerScore">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Area -->
+        <div class="game-area">
+            <!-- AI Move Display -->
+            <div class="ai-section">
+                <div class="move-display" id="aiMoveDisplay">
+                    <img id="aiMoveImage" src="" alt="AI Move" style="display: none;">
+                </div>
+                <p class="section-label">AI Move</p>
+            </div>
+
+            <!-- Timer Display -->
+            <div class="timer-section">
+                <div class="timer" id="timer"></div>
+                <div class="game-status" id="gameStatus">Loading...</div>
+                <div class="loading-indicator" id="loadingIndicator">
+                    <div class="spinner"></div>
+                    <span>Loading hand detection...</span>
+                </div>
+            </div>
+
+            <!-- Player Camera -->
+            <div class="player-section">
+                <div class="camera-container">
+                    <video id="videoElement" autoplay muted playsinline></video>
+                    <canvas id="canvasElement"></canvas>
+                </div>
+                <p class="section-label">Your Move</p>
+            </div>
+        </div>
+
+        <!-- Control Buttons -->
+        <div class="controls">
+            <button id="startButton" class="control-btn start-btn">START TOURNAMENT</button>
+            <button id="restartButton" class="control-btn restart-btn">RESTART MATCH</button>
+        </div>
+        
+        <!-- Sound Toggle -->
+        <div class="sound-controls">
+            <button id="soundToggleButton" class="sound-toggle-btn">🔊 SOUND ON</button>
+        </div>
+
+        <!-- Instructions -->
+        <div class="instructions">
+            <h3>How to Play:</h3>
+            <div class="gesture-guide">
+                <div class="gesture">
+                    <span class="gesture-icon">✊</span>
+                    <span>Rock: Hand gesture OR press R</span>
+                </div>
+                <div class="gesture">
+                    <span class="gesture-icon">✋</span>
+                    <span>Paper: Hand gesture OR press P</span>
+                </div>
+                <div class="gesture">
+                    <span class="gesture-icon">✌️</span>
+                    <span>Scissors: Hand gesture OR press S</span>
+                </div>
+            </div>
+            <p style="margin-top: 15px; font-size: 0.9rem; color: #ccc;">
+                Game works with both hand gestures and keyboard controls!
+            </p>
+        </div>
+
+        <!-- Game Over Modal -->
+        <div id="gameOverModal" class="modal">
+            <div class="modal-content">
+                <h2 id="gameOverTitle"></h2>
+                <p id="gameOverMessage"></p>
+                <div class="modal-buttons">
+                    <button id="playAgainButton" class="control-btn">PLAY AGAIN</button>
+                    <button id="endGameButton" class="control-btn end-game-btn">END GAME</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Permission Request Modal -->
+        <div id="permissionModal" class="modal">
+            <div class="modal-content">
+                <button id="closeModalButton" class="close-button">&times;</button>
+                <h2>Camera Access Required</h2>
+                <p>This game needs access to your camera to detect hand gestures.</p>
+                <div class="troubleshoot-info">
+                    <p><strong>If the permission prompt doesn't appear:</strong></p>
+                    <ul>
+                        <li>Check your browser's address bar for a camera icon</li>
+                        <li>Look for permission notifications in your browser</li>
+                        <li>Make sure you're using HTTPS or localhost</li>
+                        <li>Try refreshing the page</li>
+                        <li>Check if another app is using your camera</li>
+                    </ul>
+                    <p><strong>Debug commands:</strong> Open browser console and try:<br>
+                    <code>simpleHandTest()</code> - Simple TensorFlow hand test<br>
+                    <code>testMediaPipe()</code> - MediaPipe hand detection test<br>
+                    <code>testMotionDetection()</code> - Basic motion detection<br>
+                    <code>debugCameraAccess()</code> - Camera setup test</p>
+                </div>
+                <button id="allowCameraButton" class="control-btn">REQUEST CAMERA ACCESS</button>
+                <button id="testCameraButton" class="control-btn">TEST CAMERA ONLY</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
